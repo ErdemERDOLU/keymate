@@ -182,7 +182,7 @@ curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/2 \
 
 <img width="975" height="231" alt="image" src="https://github.com/user-attachments/assets/07e2f22b-15be-4df1-bf0a-197ea81536ff" />
 
-### 2. Manuel Route Yönetimi
+### 2. Script ile Manuel Route Yönetimi
 ```bash
 chmod +x test_run.sh
 ./test_run.sh
@@ -194,52 +194,6 @@ Bu script şunları yapar:
 - OIDC client'ını oluşturur/günceller
 - Tüm route'ları yeniden oluşturur
 
-## Konfigürasyon Detayları
-
-### APISIX Route Yapısı
-
-1. **Public Routes** (Priority: 1)
-   - `/realms/*`: Keycloak realm bilgileri
-   - `/resources/*`: Public resource endpoints
-
-2. **Auth Routes** (Priority: 2)
-   - `/auth/*`: Authentication endpoints
-
-3. **Protected Admin Routes** (Priority: 3)
-   - `/admin/realms/*/users/*`: Sadece users resource'una erişim
-   - OIDC authentication gerektirir
-
-### OIDC Konfigürasyonu
-
-```yaml
-discovery: http://keycloak.keycloak.svc.cluster.local:8080/realms/master/.well-known/openid_configuration
-client_id: apisix-client
-client_secret: [auto-generated]
-redirect_uri: http://127.0.0.1:9080/auth/callback
-```
-
-## Erişim URL'leri
-
-### Port Forwarding ile Local Erişim
-```bash
-# APISIX Gateway
-kubectl port-forward svc/apisix-gateway -n apisix 9080:80
-
-# APISIX Dashboard
-kubectl port-forward svc/apisix-dashboard -n apisix 9000:80
-
-# Keycloak
-kubectl port-forward svc/keycloak -n keycloak 8080:80
-```
-
-### Test Endpoints
-```bash
-# Public access
-curl http://127.0.0.1:9080/realms/master
-
-# Protected admin access (authentication required)
-curl http://127.0.0.1:9080/admin/realms/master/users
-```
 
 ## Troubleshooting
 
