@@ -62,8 +62,8 @@ Bu script şunları yapar:
 - Gerekli route'ları ve OIDC konfigürasyonunu yapar
 
 ### 2. Manuel kurulum : 
-### İstio kurulumu : 
-``
+# İstio kurulumu : 
+```
 kubectl create ns istio-system
 helm repo add istio https://istio-release.storage.googleapis.com/charts
 helm repo update
@@ -73,8 +73,114 @@ helm upgrade --install istio-base istio/base -n istio-system
 helm upgrade --install istiod istio/istiod -n istio-system 
 # (İstersen) Ingress Gateway
 helm upgrade --install istio-ingress istio/gateway -n istio-system
-``
+```
+#  keycloack kurulumu 
+```
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+kubectl create namespace keycloak
 
+helm install kc bitnami/keycloak -n keycloak \
+  --set auth.adminUser=admin \
+  --set auth.adminPassword='Admin#12345' \
+  --set postgresql.enabled=true \
+  --set postgresql.auth.postgresPassword='Pg#12345'
+
+```
+# Apsix Kurulumu: 
+
+```
+kubectl create ns apisix 
+kubectl label namespace apisix istio-injection=enabled --overwrite
+helm repo add apisix https://charts.apiseven.com 
+helm repo update  
+helm upgrade apisix apisix/apisix --namespace apisix \
+  --set dashboard.enabled=true \
+  --set ingress-controller.enabled=true \
+  --set ingress-controller.config.apisix.serviceNamespace=apisix \
+  --set ingress-controller.config.apisix.serviceName=apisix-admin \
+  --set ingress-controller.config.apisix.servicePort=9180 \
+  --set ingress-controller.config.apisix.baseURL="http://apisix-admin.apisix.svc.cluster.local:9180/apisix/admin" \
+  --set admin.enabled=true \
+  --set admin.allow.ipList={"0.0.0.0/0"} \
+  --set admin.credentials.admin=edd1c9f034335f136f87ad84b625c8f1 \
+  --set ingress-controller.config.apisix.adminKey=edd1c9f034335f136f87ad84b625c8f1
+```
+
+#  Template altındaki bütün yaml’lar apply edilir
+
+```
+kubectl apply -f template/plugins/
+kubectl apply -f template/upstreams/
+kubectl apply -f template/
+```
+
+
+## Apisix kurulumu sırasında oluşan configmap’te apsix gateway parametresi çalışmıyor eski versionlarında çalışıyoro laiblir bu yüzden template altında oluşturdugum ApisixRoute ve ApisixPluginConfig kind’ları ingress’e bir şekilde route olamıyor bunun geçmek için curl ile ilgili komutları çalıştırıp manuel bir şekilde ilgili kind’ları ekliyoruz. 
+
+
+# Port-forward başlat
+``` kubectl port-forward -n apisix svc/apisix-admin 9180:9180 & ```
+
+# Keycloak service IP'sini al
+``` KC_SERVICE_IP=$(kubectl get svc kc-keycloak -n keycloak -o jsonpath='{.spec.clusterIP}') ```
+
+# Client secret'ı yukarıdan al ve kullan
+``` CLIENT_SECRET="zNbh7IuUnj1Qc7wXXDGgNgB1QZ3Rnh1H" ```
+
+```
+curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/1 \
+  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "kc-admin-auth",
+    "uri": "/admin/realms/master/users",
+    "host": "kc-admin.local",
+    "priority": 1,
+    "plugins": {
+      "openid-connect": {
+        "client_id": "apisix-admin",
+        "client_secret": "'$CLIENT_SECRET'",
+        "discovery": "http://'$KC_SERVICE_IP':8080/realms/master/.well-known/openid_configuration",
+        "scope": "openid profile email",
+        "bearer_only": false,
+        "realm": "master"
+      }
+    },
+    "upstream": {
+      "type": "roundrobin",
+      "nodes": {
+        "'$KC_SERVICE_IP':8080": 1
+      }
+    }
+  }'
+```
+
+# 2. Fallback Route (Deny All)
+```
+curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/2 \
+  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "kc-admin-deny",
+    "uri": "/*",
+    "host": "kc-admin.local",
+    "priority": 100,
+    "plugins": {
+      "response-rewrite": {
+        "status_code": 403,
+        "body": "{\"error\":\"Access denied. Authentication required.\"}"
+      }
+    }
+  }'
+```
+# Denied:
+<img width="975" height="168" alt="image" src="https://github.com/user-attachments/assets/0929a8e4-9b8d-4371-bb94-f4c6d9833a1f" />
+
+
+# Hata için biraz daha uğraşmam lazım😊 
+
+<img width="975" height="231" alt="image" src="https://github.com/user-attachments/assets/07e2f22b-15be-4df1-bf0a-197ea81536ff" />
 
 ### 2. Manuel Route Yönetimi
 ```bash
