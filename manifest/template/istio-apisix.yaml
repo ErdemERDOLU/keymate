@@ -1,0 +1,34 @@
+# kc-admin-gw'yi güncelle
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: kc-admin-gw
+  namespace: istio-system
+spec:
+  selector:
+    app: istio-ingress      
+    istio: ingress          
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - kc-admin.local  # kendi domainin
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: kc-admin-vs
+  namespace: apisix
+spec:
+  hosts:
+  - kc-admin.local
+  gateways:
+  - istio-system/kc-admin-gw
+  http:
+  - route:
+    - destination:
+        host: apisix-gateway.apisix.svc.cluster.local
+        port:
+          number: 80

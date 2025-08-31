@@ -1,0 +1,22 @@
+# kc-admin-deny-rest.yaml
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: kc-admin-deny-rest
+  namespace: keycloak
+spec:
+  ingressClassName: apisix
+  http:
+  - name: deny-all-others
+    priority: 100
+    match:
+      hosts:
+      - kc-admin.local
+      paths:
+      - /*
+    plugins:
+    - name: response-rewrite
+      enable: true
+      config:
+        status_code: 404
+        body: '{"error":"not allowed"}'

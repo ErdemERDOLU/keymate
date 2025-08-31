@@ -1,0 +1,36 @@
+#apiVersion: apisix.apache.org/v2
+#kind: ApisixUpstream
+#metadata:
+#  name: kc-keycloak            # <-- servis adınla aynı
+#  namespace: keycloak          # <-- servis ns'iyle aynı
+#spec:
+#  scheme: http                 # ihtiyacına göre http/https
+#  loadbalancer:
+#    type: roundrobin
+#  externalNodes:
+#    - type: Domain
+#      name: kc-admin.local     # dış hedef domain
+#      port: 80                 # dış hedef portu (zorunlu)
+#      weight: 100
+
+---
+# kc-admin-allow.yaml
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: kc-admin-allow
+  namespace: keycloak
+spec:
+  ingressClassName: apisix
+  http:
+  - name: allow-admin-api
+    priority: 1
+    match:
+      hosts:
+      - kc-admin.local
+      paths:
+      - /admin/realms/master/users
+    backends:
+    - serviceName: kc-keycloak
+      servicePort: 80
+

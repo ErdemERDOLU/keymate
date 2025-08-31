@@ -1,0 +1,321 @@
+#!/bin/bash
+
+# APISIX Manual Cleanup and Recreation Script
+
+set -e
+
+echo "🧹 Starting APISIX cleanup and recreation..."
+
+# API Key for APISIX Admin
+API_KEY="edd1c9f034335f136f87ad84b625c8f1"
+ADMIN_URL="http://127.0.0.1:9180/apisix/admin"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to check if port-forward is running
+check_port_forward() {
+  if ! curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" > /dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  Port-forward not detected. Starting port-forward...${NC}"
+    kubectl port-forward -n apisix svc/apisix-admin 9180:9180 &
+    sleep 5
+    
+    if ! curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" > /dev/null 2>&1; then
+      echo -e "${RED}❌ Failed to establish connection to APISIX Admin API${NC}"
+      exit 1
+    fi
+  fi
+  echo -e "${GREEN}✅ APISIX Admin API connection verified${NC}"
+}
+
+# 1. Check and start port-forward if needed
+echo "🔗 Checking APISIX Admin API connection..."
+check_port_forward
+
+# 2. Delete all existing routes
+echo "🗑️  Deleting all existing APISIX routes..."
+ROUTES=$(curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" | jq -r '.list[]?.key // empty' 2>/dev/null || echo "")
+if [ ! -z "$ROUTES" ]; then
+  for route in $ROUTES; do
+    route_id=$(echo $route | sed 's|/apisix/routes/||')
+    echo "  Deleting route: $route_id"
+    curl -s -X DELETE "$ADMIN_URL/routes/$route_id" -H "X-API-KEY: $API_KEY" > /dev/null
+  done
+  echo -e "${GREEN}✅ All routes deleted${NC}"
+else
+  echo -e "${YELLOW}ℹ️  No existing routes found${NC}"
+fi
+
+# 3. Delete all existing services
+echo "🗑️  Deleting all existing APISIX services..."
+SERVICES=$(curl -s "$ADMIN_URL/services" -H "X-API-KEY: $API_KEY" | jq -r '.list[]?.key // empty' 2>/dev/null || echo "")
+if [ ! -z "$SERVICES" ]; then
+  for service in $SERVICES; do
+    service_id=$(echo $service | sed 's|/apisix/services/||')
+    echo "  Deleting service: $service_id"
+    curl -s -X DELETE "$ADMIN_URL/services/$service_id" -H "X-API-KEY: $API_KEY" > /dev/null
+  done
+  echo -e "${GREEN}✅ All services deleted${NC}"
+else
+  echo -e "${YELLOW}ℹ️  No existing services found${NC}"
+fi
+
+# 4. Delete all existing upstreams
+echo "🗑️  Deleting all existing APISIX upstreams..."
+UPSTREAMS=$(curl -s "$ADMIN_URL/upstreams" -H "X-API-KEY: $API_KEY" | jq -r '.list[]?.key // empty' 2>/dev/null || echo "")
+if [ ! -z "$UPSTREAMS" ]; then
+  for upstream in $UPSTREAMS; do
+    upstream_id=$(echo $upstream | sed 's|/apisix/upstreams/||')
+    echo "  Deleting upstream: $upstream_id"
+    curl -s -X DELETE "$ADMIN_URL/upstreams/$upstream_id" -H "X-API-KEY: $API_KEY" > /dev/null
+  done
+  echo -e "${GREEN}✅ All upstreams deleted${NC}"
+else
+  echo -e "${YELLOW}ℹ️  No existing upstreams found${NC}"
+fi
+
+# 5. Delete Kubernetes ApisixRoute resources
+echo "🗑️  Deleting Kubernetes ApisixRoute resources..."
+APISIX_ROUTES=$(kubectl get apisixroutes -A -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' 2>/dev/null || echo "")
+if [ ! -z "$APISIX_ROUTES" ]; then
+  while read -r namespace name; do
+    if [ ! -z "$namespace" ] && [ ! -z "$name" ]; then
+      echo "  Deleting ApisixRoute: $namespace/$name"
+      kubectl delete apisixroute "$name" -n "$namespace" --ignore-not-found=true
+    fi
+  done <<< "$APISIX_ROUTES"
+  echo -e "${GREEN}✅ All ApisixRoute resources deleted${NC}"
+else
+  echo -e "${YELLOW}ℹ️  No ApisixRoute resources found${NC}"
+fi
+
+# 6. Wait for cleanup to complete
+echo "⏳ Waiting for cleanup to complete..."
+sleep 10
+
+# 7. Start Keycloak port-forward
+echo "🔗 Starting Keycloak port-forward..."
+kubectl port-forward -n keycloak svc/kc-keycloak 8081:80 &
+sleep 10
+
+# 8. Get Keycloak service info and TEST discovery
+KC_SERVICE_IP=$(kubectl get svc kc-keycloak -n keycloak -o jsonpath='{.spec.clusterIP}')
+KC_SERVICE_PORT=$(kubectl get svc kc-keycloak -n keycloak -o jsonpath='{.spec.ports[0].port}')
+echo "  Keycloak Service: $KC_SERVICE_IP:$KC_SERVICE_PORT"
+
+# Test discovery endpoint BEFORE creating routes
+echo "🧪 Testing discovery endpoint accessibility..."
+DISCOVERY_URL="http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master/.well-known/openid_configuration"
+echo "  Discovery URL: $DISCOVERY_URL"
+
+# Test from external (via port-forward)
+EXTERNAL_TEST=$(curl -s "http://localhost:8081/realms/master/.well-known/openid_configuration" | jq -r .issuer 2>/dev/null || echo "FAILED")
+echo "  External test result: $EXTERNAL_TEST"
+
+# Test from APISIX namespace using kubectl run
+echo "  Testing internal discovery access from APISIX namespace..."
+INTERNAL_TEST=$(kubectl run curl-test --image=curlimages/curl --rm -i --restart=Never -n apisix -- \
+  curl -s "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master/.well-known/openid_configuration" 2>/dev/null | jq -r .issuer 2>/dev/null || echo "FAILED")
+echo "  Internal test result: $INTERNAL_TEST"
+
+if [ "$EXTERNAL_TEST" = "FAILED" ] || [ "$INTERNAL_TEST" = "FAILED" ]; then
+  echo -e "${RED}❌ Discovery endpoint not accessible. Check Keycloak deployment.${NC}"
+  echo "Debug info:"
+  kubectl get pods -n keycloak
+  kubectl get svc -n keycloak
+  exit 1
+fi
+
+# 9. Get Keycloak client secret dynamically
+echo "🔑 Getting Keycloak client secret..."
+KC_TOKEN=$(curl -s -X POST http://localhost:8081/realms/master/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin" \
+  -d "password=Admin#12345" \
+  -d "grant_type=password" \
+  -d "client_id=admin-cli" | jq -r .access_token)
+
+if [ "$KC_TOKEN" = "null" ] || [ -z "$KC_TOKEN" ]; then
+  echo -e "${RED}❌ Failed to get Keycloak admin token${NC}"
+  exit 1
+fi
+
+CLIENT_SECRET=$(curl -s -X GET "http://localhost:8081/admin/realms/master/clients" \
+  -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[] | select(.clientId=="apisix-admin") | .id')
+
+if [ "$CLIENT_SECRET" = "null" ] || [ -z "$CLIENT_SECRET" ]; then
+  echo -e "${RED}❌ Failed to get client ID for apisix-admin${NC}"
+  exit 1
+fi
+
+ACTUAL_CLIENT_SECRET=$(curl -s -X GET "http://localhost:8081/admin/realms/master/clients/$CLIENT_SECRET/client-secret" \
+  -H "Authorization: Bearer $KC_TOKEN" | jq -r .value)
+
+if [ "$ACTUAL_CLIENT_SECRET" = "null" ] || [ -z "$ACTUAL_CLIENT_SECRET" ]; then
+  echo -e "${RED}❌ Failed to get client secret${NC}"
+  exit 1
+fi
+
+echo -e "${GREEN}✅ Client secret retrieved: $ACTUAL_CLIENT_SECRET${NC}"
+
+# 10. Create comprehensive Keycloak routes
+echo "🚀 Creating comprehensive Keycloak routes..."
+
+# Route 1: Resources (CSS, JS, Images) - NO AUTH
+echo "  Creating resources route (no auth)..."
+curl -s -X PUT "$ADMIN_URL/routes/kc-resources" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "kc-resources",
+  "uri": "/resources/*",
+  "host": "kc-admin.local",
+  "priority": 1,
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "kc-keycloak.keycloak.svc.cluster.local:80": 1
+    }
+  }
+  }' > /dev/null
+
+# Route 2: Realms endpoints - NO AUTH (needed for discovery)
+echo "  Creating realms route (no auth)..."
+curl -s -X PUT "$ADMIN_URL/routes/kc-realms" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "kc-realms",
+  "uri": "/realms/*",
+  "host": "kc-admin.local",
+  "priority": 2,
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "kc-keycloak.keycloak.svc.cluster.local:80": 1
+    }
+  }
+  }' > /dev/null
+
+# Route 3: Auth endpoints - NO AUTH (needed for login flow)
+echo "  Creating auth route (no auth)..."
+curl -s -X PUT "$ADMIN_URL/routes/kc-auth" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "kc-auth",
+  "uri": "/auth/*",
+  "host": "kc-admin.local",
+  "priority": 3,
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "kc-keycloak.keycloak.svc.cluster.local:80": 1
+    }
+  }
+  }' > /dev/null
+
+# Route 4: Admin Console - WITH OIDC AUTH (DÜZELTME: Port 80 kullan!)
+echo "  Creating protected admin route..."
+curl -s -X PUT "$ADMIN_URL/routes/kc-admin-protected" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "kc-admin-protected",
+  "uri": "/admin/realms/master/users",
+  "host": "kc-admin.local",
+  "priority": 10,
+  "plugins": {
+    "openid-connect": {
+      "client_id": "apisix-admin",
+      "client_secret": "'$ACTUAL_CLIENT_SECRET'",
+      "discovery": "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master/.well-known/openid_configuration",
+      "scope": "openid profile email",
+      "bearer_only": false,
+      "realm": "master",
+      "redirect_uri": "http://kc-admin.local/auth/callback"
+    }
+  },
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "kc-keycloak.keycloak.svc.cluster.local:80": 1
+    }
+  }
+  }' > /dev/null
+
+# Route 5: Root redirect to admin
+echo "  Creating root redirect route..."
+curl -s -X PUT "$ADMIN_URL/routes/kc-root" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "kc-root",
+  "uri": "/",
+  "host": "kc-admin.local",
+  "priority": 50,
+  "plugins": {
+    "redirect": {
+      "uri": "/admin/"
+    }
+  }
+  }' > /dev/null
+
+# Route 6: Fallback route for anything else
+echo "  Creating fallback deny route..."
+curl -s -X PUT "$ADMIN_URL/routes/kc-admin-deny" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "kc-admin-deny",
+  "uri": "/*",
+  "host": "kc-admin.local", 
+  "priority": 100,
+  "plugins": {
+    "response-rewrite": {
+      "status_code": 403,
+      "body": "{\"error\":\"Access denied. Path not allowed.\"}"
+    }
+  }
+  }' > /dev/null
+
+echo -e "${GREEN}✅ All routes created successfully${NC}"
+
+# 11. Final verification and testing
+echo "🔍 Final verification..."
+NEW_ROUTES=$(curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" | jq '.list | length')
+echo "  Total routes created: $NEW_ROUTES"
+
+echo "📋 Route details:"
+curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" | jq -r '.list[] | "  - Name: \(.value.name // "unnamed"), URI: \(.value.uri), Host: \(.value.host // "any"), Priority: \(.value.priority // "default")"'
+
+GATEWAY_PORT=$(kubectl get svc apisix-gateway -n apisix -o jsonpath='{.spec.ports[0].nodePort}')
+
+# Test discovery through APISIX
+echo "🧪 Testing discovery through APISIX routes..."
+APISIX_DISCOVERY_TEST=$(curl -s -H "Host: kc-admin.local" "http://127.0.0.1:$GATEWAY_PORT/realms/master/.well-known/openid_configuration" | jq -r .issuer 2>/dev/null || echo "FAILED")
+echo "  APISIX discovery test: $APISIX_DISCOVERY_TEST"
+
+echo ""
+echo -e "${GREEN}🎉 APISIX routes configured successfully!${NC}"
+echo ""
+echo "📝 Route Configuration:"
+echo "  1. /resources/* → No Auth (CSS/JS/Images)"
+echo "  2. /realms/*   → No Auth (OIDC Discovery)"
+echo "  3. /auth/*     → No Auth (Login Flow)"
+echo "  4. /admin/*    → OIDC Protected"
+echo "  5. /           → Redirect to /admin/"
+echo "  6. /*          → 403 Denied"
+echo ""
+echo "🧪 Test Commands:"
+echo "  1. Add to /etc/hosts: 127.0.0.1 kc-admin.local"
+echo "  2. Test discovery: curl -H 'Host: kc-admin.local' http://127.0.0.1:$GATEWAY_PORT/realms/master/.well-known/openid_configuration"
+echo "  3. Test admin: curl -H 'Host: kc-admin.local' http://127.0.0.1:$GATEWAY_PORT/admin/"
+echo "  4. Browser test: http://kc-admin.local:$GATEWAY_PORT/admin/"
+echo ""
+echo "  Gateway Port: $GATEWAY_PORT"
+echo "  Keycloak Service: $KC_SERVICE_IP:$KC_SERVICE_PORT"
+echo "  Discovery URL: http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master/.well-known/openid_configuration"
