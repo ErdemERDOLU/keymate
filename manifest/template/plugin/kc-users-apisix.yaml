@@ -15,5 +15,3 @@ spec:
       ssl_verify: true
       token_signing_alg_values_expected: ["RS256"]
       scopes: ["openid","email","profile"]
-      # (Opsiyonel) audience doğrulaması istiyorsan aç:
-      # client_id: "YOUR_GOOGLE_CLIENT_ID"

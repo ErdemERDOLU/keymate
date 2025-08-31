@@ -32,11 +32,6 @@ kubectl create ns apisix
 kubectl label namespace apisix istio-injection=enabled --overwrite
 helm repo add apisix https://charts.apiseven.com 
 helm repo update  
-# ...existing code...
-
-# ...existing code...
-
-# APISIX'i doğru config ile yeniden kur
 helm upgrade apisix apisix/apisix --namespace apisix \
   --set dashboard.enabled=true \
   --set ingress-controller.enabled=true \
@@ -53,7 +48,7 @@ helm upgrade apisix apisix/apisix --namespace apisix \
 
 kubectl port-forward -n keycloak svc/kc-keycloak 8081:80 &
 ---
-# Keycloak admin token al
+# Keycloak admin token
 KC_TOKEN=$(curl -s -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=admin" \
@@ -61,7 +56,7 @@ KC_TOKEN=$(curl -s -X POST http://localhost:8080/realms/master/protocol/openid-c
   -d "grant_type=password" \
   -d "client_id=admin-cli" | jq -r .access_token)
 
-# Client oluştur
+# Client
 curl -X POST http://localhost:8081/admin/realms/master/clients \
   -H "Authorization: Bearer $KC_TOKEN" \
   -H "Content-Type: application/json" \
@@ -78,7 +73,7 @@ curl -X POST http://localhost:8081/admin/realms/master/clients \
     "directAccessGrantsEnabled": true
   }'
 
-# Client secret al
+# Client secret
 CLIENT_SECRET=$(curl -s -X GET "http://localhost:8081/admin/realms/master/clients" \
   -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[] | select(.clientId=="apisix-admin") | .id')
 
@@ -87,14 +82,14 @@ curl -s -X GET "http://localhost:8081/admin/realms/master/clients/$CLIENT_SECRET
 
 ---
 
-# Port-forward başlat
+# Port-forward
 kubectl port-forward -n apisix svc/apisix-admin 9180:9180 &
 
-# Keycloak service IP'sini al
-# Keycloak service IP'sini al
+# Keycloak service IP
+
 KC_SERVICE_IP=$(kubectl get svc kc-keycloak -n keycloak -o jsonpath='{.spec.clusterIP}')
 
-# Client secret'ı yukarıdan al ve kullan
+# Client secret
 CLIENT_SECRET="zNbh7IuUnj1Qc7wXXDGgNgB1QZ3Rnh1H"
 
 curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/1 \
