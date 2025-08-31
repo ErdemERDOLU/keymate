@@ -291,31 +291,3 @@ echo "  Total routes created: $NEW_ROUTES"
 
 echo "📋 Route details:"
 curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" | jq -r '.list[] | "  - Name: \(.value.name // "unnamed"), URI: \(.value.uri), Host: \(.value.host // "any"), Priority: \(.value.priority // "default")"'
-
-GATEWAY_PORT=$(kubectl get svc apisix-gateway -n apisix -o jsonpath='{.spec.ports[0].nodePort}')
-
-# Test discovery through APISIX
-echo "🧪 Testing discovery through APISIX routes..."
-APISIX_DISCOVERY_TEST=$(curl -s -H "Host: kc-admin.local" "http://127.0.0.1:$GATEWAY_PORT/realms/master/.well-known/openid_configuration" | jq -r .issuer 2>/dev/null || echo "FAILED")
-echo "  APISIX discovery test: $APISIX_DISCOVERY_TEST"
-
-echo ""
-echo -e "${GREEN}🎉 APISIX routes configured successfully!${NC}"
-echo ""
-echo "📝 Route Configuration:"
-echo "  1. /resources/* → No Auth (CSS/JS/Images)"
-echo "  2. /realms/*   → No Auth (OIDC Discovery)"
-echo "  3. /auth/*     → No Auth (Login Flow)"
-echo "  4. /admin/*    → OIDC Protected"
-echo "  5. /           → Redirect to /admin/"
-echo "  6. /*          → 403 Denied"
-echo ""
-echo "🧪 Test Commands:"
-echo "  1. Add to /etc/hosts: 127.0.0.1 kc-admin.local"
-echo "  2. Test discovery: curl -H 'Host: kc-admin.local' http://127.0.0.1:$GATEWAY_PORT/realms/master/.well-known/openid_configuration"
-echo "  3. Test admin: curl -H 'Host: kc-admin.local' http://127.0.0.1:$GATEWAY_PORT/admin/"
-echo "  4. Browser test: http://kc-admin.local:$GATEWAY_PORT/admin/"
-echo ""
-echo "  Gateway Port: $GATEWAY_PORT"
-echo "  Keycloak Service: $KC_SERVICE_IP:$KC_SERVICE_PORT"
-echo "  Discovery URL: http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master/.well-known/openid_configuration"
