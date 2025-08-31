@@ -61,6 +61,21 @@ Bu script şunları yapar:
 - APISIX Gateway'i kurar
 - Gerekli route'ları ve OIDC konfigürasyonunu yapar
 
+### 2. Manuel kurulum : 
+### İstio kurulumu : 
+``
+kubectl create ns istio-system
+helm repo add istio https://istio-release.storage.googleapis.com/charts
+helm repo update
+# Base
+helm upgrade --install istio-base istio/base -n istio-system
+# Control plane
+helm upgrade --install istiod istio/istiod -n istio-system 
+# (İstersen) Ingress Gateway
+helm upgrade --install istio-ingress istio/gateway -n istio-system
+``
+
+
 ### 2. Manuel Route Yönetimi
 ```bash
 chmod +x test_run.sh
@@ -120,23 +135,6 @@ curl http://127.0.0.1:9080/realms/master
 curl http://127.0.0.1:9080/admin/realms/master/users
 ```
 
-## Güvenlik Özellikleri
-
-### OAuth Token Validation
-- Google OAuth tokenleri için OIDC plugin
-- JWT token doğrulama
-- Automatic token refresh
-
-### Keycloak Admin API Kısıtlaması
-- Sadece `/admin/realms/*/users/*` endpoint'lerine erişim
-- Diğer admin endpoint'leri bloklu
-- Role-based access control (RBAC)
-
-### Istio Security
-- mTLS encryption
-- Service-to-service authentication
-- Network policies
-
 ## Troubleshooting
 
 ### APISIX Controller Sync Issues
@@ -192,51 +190,3 @@ spec:
         host: apisix-gateway.apisix.svc.cluster.local
 ```
 
-## Monitoring ve Logging
-
-### APISIX Metrics
-```bash
-# Prometheus metrics
-curl http://127.0.0.1:9091/apisix/prometheus/metrics
-```
-
-### Istio Observability
-```bash
-# Kiali dashboard
-kubectl port-forward -n istio-system svc/kiali 20001:20001
-
-# Jaeger tracing
-kubectl port-forward -n istio-system svc/jaeger 16686:16686
-```
-
-## Deployment Notes
-
-### Production Considerations
-- SSL/TLS certificates için cert-manager kullanın
-- Resource limits ve requests tanımlayın
-- Network policies uygulayın
-- Backup stratejisi oluşturun
-
-### Scaling
-```bash
-# APISIX horizontal scaling
-kubectl scale deployment apisix --replicas=3 -n apisix
-
-# Keycloak clustering için external database gerekli
-```
-
-## Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır.
-
-## Katkıda Bulunma
-
-1. Fork'layın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit'leyin (`git commit -m 'Add some amazing feature'`)
-4. Push'layın (`git push origin feature/amazing-feature`)
-5. Pull Request açın
-
-## Destek
-
-Issues sekmesinde sorularınızı ve bug raporlarınızı paylaşabilirsiniz.
