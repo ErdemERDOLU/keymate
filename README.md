@@ -175,12 +175,13 @@ curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/2 \
   }'
 ```
 # Denied:
-<img width="975" height="168" alt="image" src="https://github.com/user-attachments/assets/0929a8e4-9b8d-4371-bb94-f4c6d9833a1f" />
+<img width="1071" height="272" alt="image" src="https://github.com/user-attachments/assets/4b0d8399-f9d6-4992-b050-5dffb28ce2b0" />
 
 
-# Hata için biraz daha uğraşmam lazım😊 
+# Erişebilir url 
 
-<img width="975" height="231" alt="image" src="https://github.com/user-attachments/assets/07e2f22b-15be-4df1-bf0a-197ea81536ff" />
+<img width="875" height="317" alt="image" src="https://github.com/user-attachments/assets/a51dd07f-0102-4eba-a4d2-3f7efc59ad80" />
+
 
 ### 2. Script ile Manuel Route Yönetimi
 ```bash
