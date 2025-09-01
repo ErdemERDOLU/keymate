@@ -107,9 +107,11 @@ helm upgrade apisix apisix/apisix --namespace apisix \
   --set ingress-controller.config.apisix.adminKey=edd1c9f034335f136f87ad84b625c8f1
 ```
 
-#  Template altındaki bütün yaml’lar apply edilir
+#  Template altındaki bütün yaml’lar apply edilir istenirse helm ile yüklemede yapıılabilir . 
 
 ```
+cd manifest/helm/
+helm install keymate . -n default
 kubectl apply -f template/
 ```
 
