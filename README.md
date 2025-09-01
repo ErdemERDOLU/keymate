@@ -182,10 +182,10 @@ curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/2 \
 
 <img width="875" height="317" alt="image" src="https://github.com/user-attachments/assets/a51dd07f-0102-4eba-a4d2-3f7efc59ad80" />
 
-### 3. Otomatik kurulum
+### 3. Test
 ```bash
-chmod +x run.sh
-./run.sh
+chmod +x test_authz_updated.sh
+./test_authz_updated.sh
 ```
 
 
