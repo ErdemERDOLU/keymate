@@ -110,8 +110,6 @@ helm upgrade apisix apisix/apisix --namespace apisix \
 #  Template altındaki bütün yaml’lar apply edilir
 
 ```
-kubectl apply -f template/plugins/
-kubectl apply -f template/upstreams/
 kubectl apply -f template/
 ```
 
