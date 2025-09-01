@@ -224,33 +224,4 @@ kubectl exec -it -n apisix deployment/apisix -- nslookup keycloak.keycloak.svc.c
 # APISIX route listesi
 curl http://127.0.0.1:9180/apisix/admin/routes -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1"
 
-# Route deletion (if needed)
-curl -X DELETE http://127.0.0.1:9180/apisix/admin/routes/1 -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1"
 ```
-
-## Gelişmiş Konfigürasyon
-
-### Custom OIDC Provider
-```bash
-# OIDC client secret'ını manuel olarak ayarla
-kubectl create secret generic oidc-secret -n apisix --from-literal=client-secret=your-secret
-```
-
-### Istio Traffic Management
-```yaml
-# Custom VirtualService için
-apiVersion: networking.istio.io/v1beta1
-kind: VirtualService
-metadata:
-  name: keymate-routing
-spec:
-  hosts:
-  - "*"
-  gateways:
-  - istio-system/keymate-gateway
-  http:
-  - route:
-    - destination:
-        host: apisix-gateway.apisix.svc.cluster.local
-```
-
