@@ -123,35 +123,29 @@ kubectl apply -f template/
 # Keycloak service IP'sini al
 ``` KC_SERVICE_IP=$(kubectl get svc kc-keycloak -n keycloak -o jsonpath='{.spec.clusterIP}') ```
 
-# Client secret'ı yukarıdan al ve kullan
-``` CLIENT_SECRET="zNbh7IuUnj1Qc7wXXDGgNgB1QZ3Rnh1H" ```
-
+#  ALLOW RULE
 ```
-curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/1 \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+# APISIX Admin API'ye erişim kontrolü
+ADMIN_KEY="edd1c9f034335f136f87ad84b625c8f1"
+ADMIN_URL="http://127.0.0.1:9180/apisix/admin"
+
+ kubectl port-forward -n apisix svc/apisix-admin 9180:9180 &
+
+echo "📝 Route 1: Protected Admin Users (sadece erişilebilir endpoint)..."
+curl -X PUT "$ADMIN_URL/routes/1" \
+  -H "X-API-KEY: $ADMIN_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "kc-admin-auth",
-    "uri": "/admin/realms/master/users",
-    "host": "kc-admin.local",
+    "name": "keycloak-admin-users-only",
+    "uri": "/admin/realms/master/users*",
     "priority": 1,
-    "plugins": {
-      "openid-connect": {
-        "client_id": "apisix-admin",
-        "client_secret": "'$CLIENT_SECRET'",
-        "discovery": "http://'$KC_SERVICE_IP':8080/realms/master/.well-known/openid_configuration",
-        "scope": "openid profile email",
-        "bearer_only": false,
-        "realm": "master"
-      }
-    },
     "upstream": {
       "type": "roundrobin",
       "nodes": {
-        "'$KC_SERVICE_IP':8080": 1
+        "kc-keycloak.keycloak.svc.cluster.local:80": 1
       }
     }
-  }'
+  }' && echo "✅ Admin users route oluşturuldu (sadece erişilebilir)"
 ```
 
 # 2. Fallback Route (Deny All)
