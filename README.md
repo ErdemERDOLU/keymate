@@ -182,17 +182,20 @@ curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/2 \
 
 <img width="875" height="317" alt="image" src="https://github.com/user-attachments/assets/a51dd07f-0102-4eba-a4d2-3f7efc59ad80" />
 
+### 3. Otomatik kurulum
+```bash
+chmod +x run.sh
+./run.sh
+```
+
 
 ### 2. Script ile Manuel Route Yönetimi
 ```bash
-chmod +x recreate_run.sh
-./recreate_run.sh
+chmod +x create_apisix_routes.sh
+./create_apisix_routes.sh
 ```
 
 Bu script şunları yapar:
-- Mevcut APISIX route'larını temizler
-- Keycloak discovery endpoint'ini test eder
-- OIDC client'ını oluşturur/günceller
 - Tüm route'ları yeniden oluşturur
 
 
