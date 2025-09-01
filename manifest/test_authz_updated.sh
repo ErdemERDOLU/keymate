@@ -1,18 +1,12 @@
 #!/bin/bash
 
-echo "🔐 Istio AuthorizationPolicy Test Script (Updated)"
+echo "🔐 Istio AuthorizationPolicy Test Script"
 echo "=================================================="
 
 echo "📋 Testing current setup:"
-echo "✅ Gateway created"
-echo "✅ VirtualService configured" 
-echo "✅ Protected users route created (sadece erişilebilir endpoint)"
-echo "✅ Authentication required routes created (diğer tüm endpoint'ler)"
-echo "✅ RequestAuthentication applied"
-echo "✅ AuthorizationPolicy applied"
-echo ""
 
-# Test 1: Protected admin users endpoint (sadece erişilebilir)
+
+# Test 1: Protected admin users endpoint
 echo "Test 1: Admin users endpoint without token (should require auth - 401)"
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:80/admin/realms/master/users)
 echo "Response code: $RESPONSE"
@@ -56,7 +50,7 @@ fi
 echo "✅ Token obtained: ${KC_TOKEN:0:20}..."
 echo ""
 
-# Test 4: Admin users endpoint with valid token (sadece bu erişilebilir olmalı)
+# Test 4: Admin users endpoint with valid token
 echo "Test 4: Admin users endpoint with valid token (should work - only accessible endpoint)"
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer $KC_TOKEN" \
@@ -70,7 +64,7 @@ fi
 echo ""
 
 # Test 5: Invalid token
-echo "Test 5: Admin endpoint with invalid token (should be blocked)"
+echo "Test 5: Admin endpoint with invalid token"
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer invalid-token-12345" \
   http://127.0.0.1:80/admin/realms/master/users)

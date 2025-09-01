@@ -1,20 +1,3 @@
-#apiVersion: apisix.apache.org/v2
-#kind: ApisixUpstream
-#metadata:
-#  name: kc-keycloak            # <-- servis adınla aynı
-#  namespace: keycloak          # <-- servis ns'iyle aynı
-#spec:
-#  scheme: http                 # ihtiyacına göre http/https
-#  loadbalancer:
-#    type: roundrobin
-#  externalNodes:
-#    - type: Domain
-#      name: kc-admin.local     # dış hedef domain
-#      port: 80                 # dış hedef portu (zorunlu)
-#      weight: 100
-
----
-# kc-admin-allow.yaml
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:

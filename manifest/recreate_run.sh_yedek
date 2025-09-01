@@ -164,7 +164,7 @@ echo -e "${GREEN}✅ Client secret retrieved: $ACTUAL_CLIENT_SECRET${NC}"
 # 10. Create comprehensive Keycloak routes
 echo "🚀 Creating comprehensive Keycloak routes..."
 
-# Route 1: Resources (CSS, JS, Images) - NO AUTH
+# Route 1: Resources
 echo "  Creating resources route (no auth)..."
 curl -s -X PUT "$ADMIN_URL/routes/kc-resources" \
   -H "X-API-KEY: $API_KEY" \

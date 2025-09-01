@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # APISIX Route Oluşturma Scripti
-# Test edilmiş ve çalışan konfigürasyon
 
 echo "🚀 APISIX Routes Oluşturuluyor..."
 echo "=================================="
@@ -9,6 +8,24 @@ echo "=================================="
 # APISIX Admin API'ye erişim kontrolü
 ADMIN_KEY="edd1c9f034335f136f87ad84b625c8f1"
 ADMIN_URL="http://127.0.0.1:9180/apisix/admin"
+
+check_port_forward() {
+  if ! curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" > /dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  Port-forward not detected. Starting port-forward...${NC}"
+    kubectl port-forward -n apisix svc/apisix-admin 9180:9180 &
+    sleep 5
+    
+    if ! curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $API_KEY" > /dev/null 2>&1; then
+      echo -e "${RED}❌ Failed to establish connection to APISIX Admin API${NC}"
+      exit 1
+    fi
+  fi
+  echo -e "${GREEN}✅ APISIX Admin API connection verified${NC}"
+}
+
+# 1. Check and start port-forward if needed
+echo "🔗 Checking APISIX Admin API connection..."
+check_port_forward
 
 # Test APISIX Admin API connectivity
 echo "📡 APISIX Admin API bağlantısı test ediliyor..."

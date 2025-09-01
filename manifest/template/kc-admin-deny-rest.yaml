@@ -1,4 +1,3 @@
-# kc-admin-deny-rest.yaml
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:

@@ -1,7 +1,4 @@
-# Istio Gateway ve AuthorizationPolicy Konfigürasyonu
-# Bu dosya çalışan test sonuçlarına göre güncellenmiştir
-
-# Gateway - Tüm host'lar için wildcard kullanıyoruz (test edildi ✅)
+# Gateway - Tüm host'lar için wildcard kullanıyoruz 
 apiVersion: networking.istio.io/v1beta1
 kind: Gateway
 metadata:
@@ -17,9 +14,9 @@ spec:
       name: http
       protocol: HTTP
     hosts:
-    - "*"  # Wildcard - tüm host'lar için çalışıyor
+    - "*"  # Wildcard - tüm host'lar için
 ---
-# VirtualService - APISIX'e routing (test edildi ✅)
+# VirtualService - APISIX'e routing 
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
@@ -37,7 +34,7 @@ spec:
         port:
           number: 80
 ---
-# JWT Token doğrulama için RequestAuthentication (çalışıyor ✅)
+# JWT Token doğrulama için RequestAuthentication
 apiVersion: security.istio.io/v1beta1
 kind: RequestAuthentication
 metadata:
@@ -54,7 +51,7 @@ spec:
     audiences:
     - "admin-cli"  # admin-cli client kullanıyoruz
     outputPayloadToHeader: "jwt-payload"
-  # Google OAuth JWT Rules (opsiyonel)
+  # Google OAuth JWT Rules
   - issuer: "https://accounts.google.com"
     jwksUri: "https://www.googleapis.com/oauth2/v3/certs"
     audiences:
@@ -84,7 +81,7 @@ spec:
       values: 
       - "admin-cli"
 ---
-# RBAC AuthorizationPolicy - Role-based access (sadece users endpoint için)
+# RBAC AuthorizationPolicy - Role-based access
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
@@ -95,7 +92,7 @@ spec:
     matchLabels:
       app: apisix
   rules:
-  # Admin rolü gereksinimleri (sadece users endpoint için)
+  # Admin rolü gereksinimleri
   - to:
     - operation:
         paths: ["/admin/realms/master/users*"]
@@ -115,7 +112,7 @@ spec:
       app: apisix
   action: DENY
   rules:
-  # Tüm diğer endpoint'ler için deny (authentication required uyarısı)
+  # Tüm diğer endpoint'ler için deny
   - to:
     - operation:
         paths: ["/*"]
