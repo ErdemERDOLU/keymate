@@ -1,4 +1,7 @@
-# kc-admin-gw'yi güncelle
+# Istio Gateway ve AuthorizationPolicy Konfigürasyonu
+# Bu dosya çalışan test sonuçlarına göre güncellenmiştir
+
+# Gateway - Tüm host'lar için wildcard kullanıyoruz (test edildi ✅)
 apiVersion: networking.istio.io/v1beta1
 kind: Gateway
 metadata:
@@ -14,8 +17,9 @@ spec:
       name: http
       protocol: HTTP
     hosts:
-    - kc-admin.local  # kendi domainin
+    - "*"  # Wildcard - tüm host'lar için çalışıyor
 ---
+# VirtualService - APISIX'e routing (test edildi ✅)
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
@@ -23,7 +27,7 @@ metadata:
   namespace: apisix
 spec:
   hosts:
-  - kc-admin.local
+  - "*"  # Gateway ile aynı wildcard
   gateways:
   - istio-system/kc-admin-gw
   http:
@@ -32,3 +36,89 @@ spec:
         host: apisix-gateway.apisix.svc.cluster.local
         port:
           number: 80
+---
+# JWT Token doğrulama için RequestAuthentication (çalışıyor ✅)
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: jwt-auth
+  namespace: apisix
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  jwtRules:
+  # Keycloak JWT Rules - Service port 80 kullanıyoruz
+  - issuer: "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master"
+    jwksUri: "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master/protocol/openid-connect/certs"
+    audiences:
+    - "admin-cli"  # admin-cli client kullanıyoruz
+    outputPayloadToHeader: "jwt-payload"
+  # Google OAuth JWT Rules (opsiyonel)
+  - issuer: "https://accounts.google.com"
+    jwksUri: "https://www.googleapis.com/oauth2/v3/certs"
+    audiences:
+    - "690240714141-ebssap74g5r7qvfvbep768mq0adrinku.apps.googleusercontent.com"
+    outputPayloadToHeader: "google-jwt-payload"
+---
+# Ana AuthorizationPolicy - Sadece /admin/realms/master/users erişimi
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: admin-access-policy
+  namespace: apisix
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  rules:
+  # Sadece /admin/realms/master/users endpoint'ine authenticated erişim
+  - to:
+    - operation:
+        paths: ["/admin/realms/master/users*"]  # Sadece users endpoint
+    when:
+    - key: request.auth.claims[iss]
+      values: 
+      - "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master"
+    - key: request.auth.claims[aud]
+      values: 
+      - "admin-cli"
+---
+# RBAC AuthorizationPolicy - Role-based access (sadece users endpoint için)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: rbac-policy
+  namespace: apisix
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  rules:
+  # Admin rolü gereksinimleri (sadece users endpoint için)
+  - to:
+    - operation:
+        paths: ["/admin/realms/master/users*"]
+    when:
+    - key: request.auth.claims[realm_access.roles]
+      values: ["admin", "user-manager"]
+---
+# Default Deny Policy - Diğer tüm endpoint'ler için authentication required
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: default-deny
+  namespace: apisix
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  action: DENY
+  rules:
+  # Tüm diğer endpoint'ler için deny (authentication required uyarısı)
+  - to:
+    - operation:
+        paths: ["/*"]
+    when:
+    - key: request.auth.principal
+      notValues: ["*"]

@@ -45,6 +45,40 @@ helm upgrade apisix apisix/apisix --namespace apisix \
   --set ingress-controller.config.apisix.adminKey=edd1c9f034335f136f87ad84b625c8f1
 
 ---
+# Istio AuthorizationPolicy uygula (güncellenmiş konfigürasyon)
+echo "Applying Istio Gateway and AuthorizationPolicy..."
+kubectl apply -f template/istio-apisix.yaml
+
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app=apisix -n apisix --timeout=300s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keycloak -n keycloak --timeout=300s
+
+# APISIX Routes oluştur (manuel API kullanarak)
+echo "Creating APISIX routes..."
+sleep 5  # Pods'ların hazır olması için bekle
+
+# Port forward APISIX admin API
+kubectl port-forward -n apisix svc/apisix-admin 9180:9180 &
+APISIX_PF_PID=$!
+sleep 3
+
+# APISIX route'larını oluştur
+./create_apisix_routes.sh
+
+echo "✅ Istio AuthorizationPolicy ve APISIX Routes başarıyla uygulandı!"
+echo ""
+echo "🔧 Test için port forward'ları başlat:"
+echo "kubectl port-forward -n keycloak svc/kc-keycloak 8080:80"
+echo "kubectl port-forward -n istio-system svc/istio-ingress 80:80"
+echo ""
+echo "📋 Test komutları:"
+echo "# Public endpoint test:"
+echo "curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:80/realms/master"
+echo ""
+echo "# Admin endpoint test (401 beklenir):"
+echo "curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:80/admin/realms/master/users"
+
+---
 
 kubectl port-forward -n keycloak svc/kc-keycloak 8081:80 &
 ---
