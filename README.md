@@ -156,21 +156,29 @@ curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/1 \
 
 # 2. Fallback Route (Deny All)
 ```
-curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/2 \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+# APISIX Admin API'ye erişim kontrolü
+ADMIN_KEY="edd1c9f034335f136f87ad84b625c8f1"
+ADMIN_URL="http://127.0.0.1:9180/apisix/admin"
+
+ kubectl port-forward -n apisix svc/apisix-admin 9180:9180 &
+
+curl -X PUT "$ADMIN_URL/routes/2" \
+  -H "X-API-KEY: $ADMIN_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "kc-admin-deny",
+    "name": "authentication-required",
     "uri": "/*",
-    "host": "kc-admin.local",
-    "priority": 100,
+    "priority": 10,
     "plugins": {
       "response-rewrite": {
-        "status_code": 403,
-        "body": "{\"error\":\"Access denied. Authentication required.\"}"
+        "status_code": 401,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"error\":\"Authentication Required\",\"message\":\"Bu sayfaya erişim için authentication gereklidir. Sadece /admin/realms/master/users endpoint erişilebilir.\",\"allowed_endpoint\":\"/admin/realms/master/users\"}"
       }
     }
-  }'
+  }' && echo "✅ Authentication required route oluşturuldu"
 ```
 # Denied:
 <img width="1071" height="272" alt="image" src="https://github.com/user-attachments/assets/4b0d8399-f9d6-4992-b050-5dffb28ce2b0" />
