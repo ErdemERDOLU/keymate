@@ -185,8 +185,8 @@ curl -X PUT http://127.0.0.1:9180/apisix/admin/routes/2 \
 
 ### 2. Script ile Manuel Route Yönetimi
 ```bash
-chmod +x test_run.sh
-./test_run.sh
+chmod +x recreate_run.sh
+./recreate_run.sh
 ```
 
 Bu script şunları yapar:
