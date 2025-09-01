@@ -1,0 +1,115 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ .Values.istioGateway.name }}
+  namespace: {{ .Values.istioGateway.namespace }}
+spec:
+  selector:
+    app: {{ .Values.istioGateway.appLabel }}     
+    istio: {{ .Values.istioGateway.istioLabel }}       
+  servers:
+  - port:
+      number: {{ .Values.istioGateway.port }}
+      name: http
+      protocol: HTTP
+    hosts:
+    - {{ .Values.istioGateway.host | quote }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ .Values.virtualService.name }}
+  namespace: {{ .Values.virtualService.namespace }}
+spec:
+  hosts:
+  - {{ .Values.istioGateway.host | quote }}
+  gateways:
+  - {{ .Values.istioGateway.namespace }}/{{ .Values.virtualService.gateway }}
+  http:
+  - route:
+    - destination:
+        host: {{ .Values.virtualService.apisixHost }}
+        port:
+          number: {{ .Values.virtualService.apisixPort }}
+---
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: jwt-auth
+  namespace: {{ .Values.virtualService.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  jwtRules:
+  - issuer: {{ .Values.jwt.keycloakIssuer | quote }}
+    jwksUri: {{ .Values.jwt.keycloakJwks | quote }}
+    audiences:
+    - {{ .Values.jwt.keycloakAudience | quote }}
+    outputPayloadToHeader: "jwt-payload"
+  - issuer: {{ .Values.jwt.googleIssuer | quote }}
+    jwksUri: {{ .Values.jwt.googleJwks | quote }}
+    audiences:
+    - {{ .Values.jwt.googleAudience | quote }}
+    outputPayloadToHeader: "google-jwt-payload"
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: admin-access-policy
+  namespace: {{ .Values.virtualService.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  rules:
+    # Sadece /admin/realms/master/users endpoint'ine authenticated erişim
+    - to:
+        - operation:
+            paths: [{{ .Values.authPolicy.usersPath | quote }}]  # Sadece users endpoint
+      when:
+        - key: request.auth.claims[iss]
+          values: 
+            - {{ .Values.authPolicy.allowedIssuer | quote }}
+        - key: request.auth.claims[aud]
+          values: 
+            - {{ .Values.authPolicy.allowedAudience | quote }}
+---
+# RBAC AuthorizationPolicy - Role-based access
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: rbac-policy
+  namespace: {{ .Values.virtualService.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  rules:
+  # Admin rolü gereksinimleri
+  - to:
+    - operation:
+        paths: [{{ .Values.authPolicy.usersPath | quote }}]
+    when:
+    - key: request.auth.claims[realm_access.roles]
+      values: {{ toYaml .Values.authPolicy.allowedRoles | nindent 10 }}
+---
+# Default Deny Policy - Diğer tüm endpoint'ler için authentication required
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: default-deny
+  namespace: {{ .Values.virtualService.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: apisix
+  action: DENY
+  rules:
+  # Tüm diğer endpoint'ler için deny
+  - to:
+    - operation:
+        paths: ["/*"]
+    when:
+    - key: request.auth.principal
+      notValues: ["*"]

@@ -1,0 +1,19 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ .Values.apisix.allowRouteName }}
+  namespace: {{ .Values.apisix.namespace }}
+spec:
+  ingressClassName: {{ .Values.apisix.ingressClass }}
+  http:
+  - name: allow-admin-api
+    priority: 1
+    match:
+      hosts:
+      - {{ .Values.apisix.host | quote }}
+      paths:
+      - {{ .Values.authPolicy.usersPath | quote }}
+    backends:
+    - serviceName: {{ .Values.apisix.serviceName }}
+      servicePort: {{ .Values.apisix.servicePort }}
+

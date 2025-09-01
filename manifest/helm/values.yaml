@@ -1,0 +1,47 @@
+
+# Default values for keymate-template-bundle
+
+# Istio Gateway
+istioGateway:
+ name: kc-admin-gw
+ namespace: istio-system
+ appLabel: istio-ingress
+ istioLabel: ingress
+ port: 80
+ host: "*"
+
+# VirtualService
+virtualService:
+ name: kc-admin-vs
+ namespace: apisix
+ gateway: kc-admin-gw
+ apisixHost: apisix-gateway.apisix.svc.cluster.local
+ apisixPort: 80
+
+# JWT/OIDC
+jwt:
+ keycloakIssuer: "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master"
+ keycloakJwks: "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master/protocol/openid-connect/certs"
+ keycloakAudience: "admin-cli"
+ googleIssuer: "https://accounts.google.com"
+ googleJwks: "https://www.googleapis.com/oauth2/v3/certs"
+ googleAudience: "690240714141-ebssap74g5r7qvfvbep768mq0adrinku.apps.googleusercontent.com"
+
+# AuthorizationPolicy
+authPolicy:
+ usersPath: "/admin/realms/master/users*"
+ allowedIssuer: "http://kc-keycloak.keycloak.svc.cluster.local:80/realms/master"
+ allowedAudience: "admin-cli"
+ allowedRoles:
+  - admin
+  - user-manager
+
+# ApisixRoute
+apisix:
+ allowRouteName: kc-admin-allow
+ denyRouteName: kc-admin-deny-rest
+ namespace: keycloak
+ ingressClass: apisix
+ host: kc-admin.local
+ serviceName: kc-keycloak
+ servicePort: 80

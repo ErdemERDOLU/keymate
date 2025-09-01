@@ -1,0 +1,21 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ .Values.apisix.denyRouteName }}
+  namespace: {{ .Values.apisix.namespace }}
+spec:
+  ingressClassName: {{ .Values.apisix.ingressClass }}
+  http:
+  - name: deny-all-others
+    priority: 100
+    match:
+      hosts:
+      - {{ .Values.apisix.host | quote }}
+      paths:
+      - /*
+    plugins:
+    - name: response-rewrite
+      enable: true
+      config:
+        status_code: 404
+        body: '{"error":"not allowed"}'
