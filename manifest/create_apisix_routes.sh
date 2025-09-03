@@ -36,7 +36,7 @@ if ! curl -s "$ADMIN_URL/routes" -H "X-API-KEY: $ADMIN_KEY" > /dev/null; then
 fi
 echo "✅ APISIX Admin API erişilebilir"
 
-# Route 1: Protected Admin Users - Sadece erişilebilir endpoint
+# Route 1: Protected Admin Users  
 echo "📝 Route 1: Protected Admin Users (sadece erişilebilir endpoint)..."
 curl -X PUT "$ADMIN_URL/routes/1" \
   -H "X-API-KEY: $ADMIN_KEY" \
@@ -53,7 +53,7 @@ curl -X PUT "$ADMIN_URL/routes/1" \
     }
   }' && echo "✅ Admin users route oluşturuldu (sadece erişilebilir)"
 
-# Route 2: Diğer tüm endpoint'ler - Authentication Required uyarısı
+# Route 2: Diğer tüm endpoint'ler  
 echo "📝 Route 2: Diğer tüm endpoint'ler için Authentication Required uyarısı..."
 curl -X PUT "$ADMIN_URL/routes/2" \
   -H "X-API-KEY: $ADMIN_KEY" \

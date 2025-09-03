@@ -48,7 +48,12 @@ sudo apt-get install jq
 
 ## Hızlı Kurulum
 
+### Kurulumları iki şekilde anlattık birinci olarak otomatik kurulum , ikinci olarak ise manuel kurulum. Hangisi istenirse o tercih edilebilir. Başlıyoruz; 
+
+
 ### 1. Otomatik Kurulum
+# Bu adımda otomatik kurulum yapılır yani hazır bir kubernetes ortamınız var gerekli uygulamaları kurduktan sonra run.sh script'i çalıştıralarak kurulum yapılabilirsiniz. 
+
 ```bash
 chmod +x run.sh
 ./run.sh
@@ -62,7 +67,8 @@ Bu script şunları yapar:
 - Gerekli route'ları ve OIDC konfigürasyonunu yapar
 
 ### 2. Manuel kurulum : 
-# İstio kurulumu : 
+
+# İstio kurulumu için aşağıdaki adımların yapılması gerekiyor. 
 ```
 kubectl create ns istio-system
 helm repo add istio https://istio-release.storage.googleapis.com/charts
@@ -74,7 +80,7 @@ helm upgrade --install istiod istio/istiod -n istio-system
 # (İstersen) Ingress Gateway
 helm upgrade --install istio-ingress istio/gateway -n istio-system
 ```
-#  keycloack kurulumu 
+#  keycloack kurulumu için aşağıdaki adımların yapılması gerekiyor. 
 ```
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
@@ -87,7 +93,7 @@ helm install kc bitnami/keycloak -n keycloak \
   --set postgresql.auth.postgresPassword='Pg#12345'
 
 ```
-# Apsix Kurulumu: 
+# Apsix Kurulumu için aşağıdaki adımların yapılması gerekiyor. 
 
 ```
 kubectl create ns apisix 
@@ -107,25 +113,29 @@ helm upgrade apisix apisix/apisix --namespace apisix \
   --set ingress-controller.config.apisix.adminKey=edd1c9f034335f136f87ad84b625c8f1
 ```
 
-#  Template altındaki bütün yaml’lar apply edilir istenirse helm ile yüklemede yapıılabilir . 
+# Bu adımda template altındaki bütün yaml’lar apply edilirsiniz, istenirsede helm ile Gateway,VirtualService,RequestAuthentication,AuthorizationPolicy ve ApisixRoute kind'larının yüklemesi gerçekleşir. . 
 
+
+### Helm ile kurulum için aşağıdaki satırları yapmanız lazım. 
 ```
 cd manifest/helm/
 helm install keymate . -n default
+```
+
+### Manifest ile kurulum için aşağıdaki adımları yapmanız gerekiyor. 
+```
 kubectl apply -f template/
 ```
 
 
-## Apisix kurulumu sırasında oluşan configmap’te apsix gateway parametresi çalışmıyor eski versionlarında çalışıyoro laiblir bu yüzden template altında oluşturdugum ApisixRoute ve ApisixPluginConfig kind’ları ingress’e bir şekilde route olamıyor bunun geçmek için curl ile ilgili komutları çalıştırıp manuel bir şekilde ilgili kind’ları ekliyoruz. 
 
-
-# Port-forward başlat
+# Bir terminalde apisix erişimi için prt-forward başlatılır.
 ``` kubectl port-forward -n apisix svc/apisix-admin 9180:9180 & ```
 
-# Keycloak service IP'sini al
+# Keycloak service IP'sini alınır. 
 ``` KC_SERVICE_IP=$(kubectl get svc kc-keycloak -n keycloak -o jsonpath='{.spec.clusterIP}') ```
 
-#  ALLOW RULE
+# apisix için port-forward yapıldıktan sonra  ALLOW RULE eklenir. 
 ```
 # APISIX Admin API'ye erişim kontrolü
 ADMIN_KEY="edd1c9f034335f136f87ad84b625c8f1"
@@ -150,7 +160,7 @@ curl -X PUT "$ADMIN_URL/routes/1" \
   }' && echo "✅ Admin users route oluşturuldu (sadece erişilebilir)"
 ```
 
-# 2. Fallback Route (Deny All)
+# 2. Fallback Route (Deny All) eklenir. 
 ```
 # APISIX Admin API'ye erişim kontrolü
 ADMIN_KEY="edd1c9f034335f136f87ad84b625c8f1"
@@ -176,6 +186,7 @@ curl -X PUT "$ADMIN_URL/routes/2" \
     }
   }' && echo "✅ Authentication required route oluşturuldu"
 ```
+
 # Denied:
 <img width="1071" height="272" alt="image" src="https://github.com/user-attachments/assets/4b0d8399-f9d6-4992-b050-5dffb28ce2b0" />
 
@@ -184,14 +195,15 @@ curl -X PUT "$ADMIN_URL/routes/2" \
 
 <img width="875" height="317" alt="image" src="https://github.com/user-attachments/assets/a51dd07f-0102-4eba-a4d2-3f7efc59ad80" />
 
-### 3. Test
+### 3. Test Bütün işlemlerin doğrulugu için altaki script çalıştıırlır ve test sonuçları en sonda yansır. 
 ```bash
 chmod +x test_authz_updated.sh
 ./test_authz_updated.sh
 ```
 
 
-### 2. Script ile Manuel Route Yönetimi
+### Eğer manuel bir şekilde root oluşturmadıysanız alttaki script ilede route'ları oluşturabilirsiniz. 
+
 ```bash
 chmod +x create_apisix_routes.sh
 ./create_apisix_routes.sh

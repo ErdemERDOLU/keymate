@@ -45,15 +45,15 @@ helm upgrade apisix apisix/apisix --namespace apisix \
   --set ingress-controller.config.apisix.adminKey=edd1c9f034335f136f87ad84b625c8f1
 
 ---
-# Istio AuthorizationPolicy uygula (güncellenmiş konfigürasyon)
+# Istio AuthorizationPolicy uygulamır
 echo "Applying Istio Gateway and AuthorizationPolicy..."
 kubectl apply -f template/istio-apisix.yaml
 
 # Wait for pods to be ready
-kubectl wait --for=condition=ready pod -l app=apisix -n apisix --timeout=300s
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keycloak -n keycloak --timeout=300s
+kubectl   --for=condition=ready pod -l app=apisix -n apisix --timeout=300s
+kubectl   --for=condition=ready pod -l app.kubernetes.io/name=keycloak -n keycloak --timeout=300s
 
-# APISIX Routes oluştur (manuel API kullanarak)
+# APISIX Routes oluştur 
 echo "Creating APISIX routes..."
 sleep 5  # Pods'ların hazır olması için bekle
 
@@ -62,7 +62,7 @@ kubectl port-forward -n apisix svc/apisix-admin 9180:9180 &
 APISIX_PF_PID=$!
 sleep 3
 
-# APISIX route'larını oluştur
+# APISIX route'lar oluşturulur
 ./create_apisix_routes.sh
 
 echo "✅ Istio AuthorizationPolicy ve APISIX Routes başarıyla uygulandı!"
@@ -82,7 +82,7 @@ echo "curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:80/admin/realms/
 
 kubectl port-forward -n keycloak svc/kc-keycloak 8081:80 &
 ---
-# Keycloak admin token
+# Keycloak admin token alınır.
 KC_TOKEN=$(curl -s -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=admin" \
